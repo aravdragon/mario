@@ -14,8 +14,8 @@ class Jetpack:
         self.active = False
         self.fuel_consumption_rate = 0.2  # Reduced fuel consumption
         self.fuel_recovery_rate = 0.4  # Increased fuel recovery
-        self.vertical_thrust = 1.2  # Increased vertical thrust
-        self.horizontal_thrust = 0.5
+        self.vertical_thrust = 2.0  # Increased vertical thrust
+        self.horizontal_thrust = 1.0  # Increased horizontal thrust
         self.particles = []
         self.fly_button_rect = pygame.Rect(10, 60, 80, 40)
         self.color_timer = 0

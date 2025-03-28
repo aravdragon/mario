@@ -64,7 +64,7 @@ class Player:
         current_speed = PLAYER_SPEED
         if self.powerups.get("speed_boost", False):
             current_speed *= 2.0  # Double speed with speed boost
-        if self.burger.active or self.powerups.get("burger", False):
+        if self.burger.active:
             current_speed *= 1.5  # 50% speed increase with burger
 
         # Get jetpack thrust
@@ -108,7 +108,7 @@ class Player:
                 self.is_jumping = True
                 self.on_ground = False
                 self.coyote_timer = 0
-            elif self.powerups.get("burger", False) and not self.can_double_jump:  # Double jump with burger
+            elif self.burger.active and not self.can_double_jump:  # Double jump with burger
                 self.y_vel = JUMP_FORCE * 0.8  # Slightly weaker second jump
                 self.can_double_jump = True  # Prevent more than double jump
 
@@ -175,7 +175,7 @@ class Player:
                     self.is_jumping = True
                     self.on_ground = False
                     self.coyote_timer = 0
-                elif self.powerups.get("burger", False) and not self.can_double_jump:  # Double jump with burger
+                elif self.burger.active and not self.can_double_jump:  # Double jump with burger
                     self.y_vel = JUMP_FORCE * 0.8  # Slightly weaker second jump
                     self.can_double_jump = True  # Prevent more than double jump
                 

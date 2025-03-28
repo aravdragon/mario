@@ -1,6 +1,7 @@
 import pygame
 import sys
 import os
+import traceback
 from src.game import Game
 from src.constants import WINDOW_WIDTH, WINDOW_HEIGHT, FPS
 

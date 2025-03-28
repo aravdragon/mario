@@ -7,9 +7,12 @@ class Shop:
         self.game = game
         self.show = False
         self.items = [
-            {"name": "Jetpack", "cost": 50, "description": "Fly for 5 minutes! Press F to activate"},
-            {"name": "Rainbow Trail", "cost": 30, "description": "Leave a rainbow trail behind you"},
-            {"name": "Burger", "cost": 20, "description": "Double jump power! Press SPACE twice"}
+            {"name": "Burger", "cost": 5, "description": "Speed boost + double jump for 1 minute"},
+            {"name": "Jetpack", "cost": 10, "description": "Permanent flying ability (Press F to fly)"},
+            {"name": "Speed Boost", "cost": 15, "description": "2x speed for 20 minutes"},
+            {"name": "Shield", "cost": 20, "description": "Invincibility for 30 seconds"},
+            {"name": "Magnet", "cost": 25, "description": "Attracts nearby coins for 10 seconds"},
+            {"name": "Rainbow Trail", "cost": 30, "description": "Permanent rainbow trail effect"}
         ]
         self.selected_item = None
         self.font = pygame.font.Font(None, 36)
@@ -30,6 +33,8 @@ class Shop:
         if self.game.score >= 5:
             self.game.score -= 5
             self.game.player.burger.active = True
+            self.game.player.burger.eaten = True  # Auto-eat the burger
+            self.game.player.burger.effect_timer = self.game.player.burger.max_effect_time
             self.game.player.can_double_jump = True
             self.powerup_timers["burger"] = time.time() + 60  # 1 minute
             self.game.show_purchase_message = True
@@ -75,6 +80,8 @@ class Shop:
             self.game.purchase_message = "Magnet purchased! Will activate for 20 seconds when shop closes."
             self.game.message_timer = 180
             self.magnet_pending = True
+            return True
+        return False
         
     def apply_trail(self):
         if self.game.score >= 30:
@@ -113,16 +120,29 @@ class Shop:
             if event.button == 1:  # Left click
                 mouse_pos = pygame.mouse.get_pos()
                 
+                # Check exit button click
+                exit_rect = pygame.Rect(WINDOW_WIDTH - 120, WINDOW_HEIGHT - 50, 100, 40)
+                if exit_rect.collidepoint(mouse_pos):
+                    self.show = False
+                    self.game.show_shop = False
+                    return
+                
                 # Check item clicks
                 for i, rect in enumerate(self.item_rects):
-                    if rect.collidepoint(mouse_pos):
+                    if rect.collidepoint(mouse_pos) and i < len(self.items):
                         item = self.items[i]
-                        if item["name"] == "Jetpack":
-                            self.apply_jetpack()
-                        elif item["name"] == "Rainbow Trail":
-                            self.apply_trail()
-                        elif item["name"] == "Burger":
+                        if item["name"] == "Burger" and self.game.score >= item["cost"]:
                             self.apply_burger()
+                        elif item["name"] == "Jetpack" and self.game.score >= item["cost"]:
+                            self.apply_jetpack()
+                        elif item["name"] == "Speed Boost" and self.game.score >= item["cost"]:
+                            self.apply_speed_boost()
+                        elif item["name"] == "Shield" and self.game.score >= item["cost"]:
+                            self.apply_shield()
+                        elif item["name"] == "Magnet" and self.game.score >= item["cost"]:
+                            self.apply_magnet()
+                        elif item["name"] == "Rainbow Trail" and self.game.score >= item["cost"]:
+                            self.apply_trail()
         
     def draw(self, screen):
         if not self.show:
