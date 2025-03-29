@@ -7,6 +7,7 @@ from .treasure import TreasureChest
 from .constants import *
 import random
 import math
+import os
 
 class Game:
     def __init__(self, screen):
@@ -31,6 +32,29 @@ class Game:
         self.fall_timer = 0
         self.max_fall_time = 300
         self.show_respawn = False
+        
+        # Initialize background music
+        try:
+            pygame.mixer.init()
+            music_path = os.path.join(os.getcwd(), "music", "megalovania.mp3")
+            print(f"\nDEBUG INFO:")
+            print(f"Current directory: {os.getcwd()}")
+            print(f"Looking for: {music_path}")
+            print(f"File exists? {os.path.exists(music_path)}")
+            print(f"Directory contents:")
+            for root, dirs, files in os.walk("music"):
+                print(f"  In {root}:")
+                for f in files:
+                    print(f"    - {f}")
+            
+            if os.path.exists(music_path):
+                pygame.mixer.music.load(music_path)
+                pygame.mixer.music.play(-1)
+                pygame.mixer.music.set_volume(0.3)
+            else:
+                print("\nERROR: Music file not found!")
+        except Exception as e:
+            print(f"\nERROR loading music: {str(e)}")
         
     def create_platform(self, x, y, width):
         platform = Platform(x, y, width, PLATFORM_HEIGHT, is_safe=True)

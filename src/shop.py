@@ -77,7 +77,7 @@ class Shop:
         if self.game.score >= 25:
             self.game.score -= 25
             self.game.show_purchase_message = True
-            self.game.purchase_message = "Magnet purchased! Will activate for 20 seconds when shop closes."
+            self.game.purchase_message = "Magnet purchased! Will activate for 10 seconds when shop closes."
             self.game.message_timer = 180
             self.magnet_pending = True
             return True
@@ -113,7 +113,7 @@ class Shop:
         if not self.game.show_shop and self.magnet_pending:
             self.magnet_pending = False
             self.game.player.powerups["magnet"] = True
-            pygame.time.set_timer(pygame.USEREVENT + 1, 20000)  # 20 seconds timer
+            self.powerup_timers["magnet"] = time.time() + 10  # 10 seconds timer
         
     def handle_input(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
