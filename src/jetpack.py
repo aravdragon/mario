@@ -9,8 +9,8 @@ class Jetpack:
         self.max_fuel = 100
         self.purchased = False
         self.permanent = False
-        self.total_time = 18000  # 5 minutes at 60 FPS (60 * 60 * 5)
-        self.time_remaining = 18000
+        self.total_time = 7200  # 2 minutes at 60 FPS (60 * 60 * 2)
+        self.time_remaining = 7200  # 2 minutes
         self.active = False
         self.fuel_consumption_rate = 0.2  # Reduced fuel consumption
         self.fuel_recovery_rate = 0.4  # Increased fuel recovery
@@ -91,6 +91,13 @@ class Jetpack:
             text = font.render("FLY (F)", True, color)
             screen.blit(text, (rect.x, rect.y))
             
+            # Draw timer showing remaining jetpack time
+            time_font = pygame.font.Font(None, 24)
+            minutes = self.time_remaining // 3600
+            seconds = (self.time_remaining % 3600) // 60
+            time_text = time_font.render(f"Time: {minutes}:{seconds:02d}", True, (255, 255, 255))
+            screen.blit(time_text, (rect.x, rect.y + 40))
+            
         # Only draw fuel gauge if purchased and not permanent
         if self.purchased and not self.permanent:
             gauge_width = 100
@@ -127,6 +134,7 @@ class Jetpack:
 
     def purchase(self):
         self.purchased = True
-        self.permanent = True  # Make jetpack permanent when purchased
+        self.permanent = False  # Make jetpack temporary (2 minutes)
+        self.time_remaining = 7200  # Reset to 2 minutes when purchased
         self.fuel = self.max_fuel
         return True 

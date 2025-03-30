@@ -3,7 +3,7 @@ from .player import Player
 from .platform import Platform
 from .coin import Coin
 from .shop import Shop
-from .treasure import TreasureChest
+from .treasure import TreasureChest, SuperChest
 from .constants import *
 import random
 import math
@@ -14,6 +14,7 @@ class Game:
         self.screen = screen
         self.coins = []
         self.treasure_chests = []  # Initialize treasure_chests list
+        self.super_chests = []  # Initialize super_chests list
         self.score = 0  # Initialize score
         self.reset_game()
         self.shop = Shop(self)
@@ -24,6 +25,8 @@ class Game:
         self.background_color = 0
         self.shop_button_rect = pygame.Rect(WINDOW_WIDTH - 120, 10, 100, 40)
         self.exit_button_rect = pygame.Rect(WINDOW_WIDTH - 120, WINDOW_HEIGHT - 50, 100, 40)
+        self.music_button_rect = pygame.Rect(10, 60, 120, 40)
+        self.music_muted = False
         self.show_purchase_message = False
         self.purchase_message = ""
         self.message_timer = 0
@@ -78,6 +81,10 @@ class Game:
         self.create_platform(0, WINDOW_HEIGHT - 40, WINDOW_WIDTH)  # Ground platform
         self.generate_new_platforms()
         
+        # Reset chests
+        self.treasure_chests = []
+        self.super_chests = []
+        
         # Reset camera
         self.camera_offset = [0, 0]
         self.camera_target = [0, 0]
@@ -123,11 +130,16 @@ class Game:
                 coin_y = y - 50
                 self.coins.append(Coin(coin_x, coin_y))
                 
-            # Add more treasure chests (15% chance per platform)
-            if random.random() < 0.15:
+            # Add chests - 15% chance for regular chest
+            chest_roll = random.random()
+            if chest_roll < 0.15:
                 chest_x = x + width // 2
                 chest_y = y - 40
-                self.treasure_chests.append(TreasureChest(chest_x, chest_y))
+                # 20% of chests will be super chests (3% of platforms)
+                if random.random() < 0.2:
+                    self.super_chests.append(SuperChest(chest_x, chest_y))
+                else:
+                    self.treasure_chests.append(TreasureChest(chest_x, chest_y))
             
         return platforms
         
@@ -171,6 +183,9 @@ class Game:
             chests.append(TreasureChest(x, y))
             
         return chests
+        
+    def create_super_chests(self):
+        pass
         
     def draw_gradient_background(self):
         # Create a surface for the gradient
@@ -237,6 +252,11 @@ class Game:
             return False  # Signal to quit the game
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
             mouse_pos = pygame.mouse.get_pos()
+            
+            # Handle music button click
+            if self.music_button_rect.collidepoint(mouse_pos):
+                self.toggle_music()
+                return True
             
             # Handle respawn button
             if self.show_respawn:
@@ -321,46 +341,67 @@ class Game:
                 coin_y = y - 50
                 self.coins.append(Coin(coin_x, coin_y))
                 
-            # Add treasure chests (15% chance per platform)
-            if random.random() < 0.15:
+            # Add chests - 15% chance for regular chest
+            chest_roll = random.random()
+            if chest_roll < 0.15:
                 chest_x = x + width // 2
                 chest_y = y - 40
-                self.treasure_chests.append(TreasureChest(chest_x, chest_y))
+                # 20% of chests will be super chests (3% of platforms)
+                if random.random() < 0.2:
+                    self.super_chests.append(SuperChest(chest_x, chest_y))
+                else:
+                    self.treasure_chests.append(TreasureChest(chest_x, chest_y))
                 
         # Update the last platform x position
         self.last_platform_x = last_x
             
     def update(self):
+        if self.game_over:
+            return
+            
+        # Update player
+        self.player.update(self.platforms)
+        
+        # Check for coin collisions
+        for coin in self.coins[:]:
+            if coin.collides_with(self.player):
+                self.coins.remove(coin)
+                self.score += 1
+                
+        # Check for treasure chest collisions
+        for chest in self.treasure_chests[:]:
+            if not chest.collected and chest.collides_with(self.player):
+                chest.collected = True
+                self.score += chest.coins
+                self.show_purchase_message = True
+                self.purchase_message = f"Found a treasure chest! +{chest.coins} coins!"
+                self.message_timer = 120
+                
+        # Check for super chest collisions
+        for super_chest in self.super_chests[:]:
+            if not super_chest.collected and super_chest.collides_with(self.player):
+                super_chest.collected = True
+                self.score += super_chest.coins
+                self.show_purchase_message = True
+                self.purchase_message = f"SUPER CHEST FOUND! +{super_chest.coins} coins!"
+                self.message_timer = 180  # Show longer for super chests
+                
         # Update background color for rainbow effect
         self.background_color = (self.background_color + RGB_CYCLE_SPEED) % 360
         
         if not self.game_over:
-            # Update player
-            self.player.update(self.platforms)
-            
             # Update camera
             self.update_camera()
             
-            # Check coin collection
-            for coin in self.coins[:]:
-                if coin.rect.colliderect(self.player.rect):
-                    self.coins.remove(coin)
-                    self.score += 1
-            
-            # Check treasure chest collection
-            for chest in self.treasure_chests[:]:
-                if not chest.collected and chest.rect.colliderect(self.player.rect):
-                    chest.collected = True
-                    self.score += 5
-                    self.show_purchase_message = True
-                    self.purchase_message = "Found a treasure chest! +5 coins!"
-                    self.message_timer = 120
-            
-            # Check for falling death
+            # Check for falling death - only show respawn after falling more than 200 pixels for 2 seconds
             if self.player.rect.top > WINDOW_HEIGHT:
-                self.fall_timer += 1
-                if self.fall_timer >= 126:  # 2.1 seconds
-                    self.show_respawn = True
+                # Check if player has fallen at least 200 pixels from last ground position
+                if self.player.last_ground_y and (self.player.rect.top - self.player.last_ground_y) > 200:
+                    self.fall_timer += 1
+                    if self.fall_timer > 120:  # 2 seconds (60 frames per second x 2)
+                        self.show_respawn = True
+                else:
+                    self.fall_timer = 0  # Reset if not falling far enough
             else:
                 self.fall_timer = 0
                 self.show_respawn = False
@@ -389,6 +430,9 @@ class Game:
         for chest in self.treasure_chests:
             chest.draw(self.screen, self.camera_offset)
             
+        for super_chest in self.super_chests:
+            super_chest.draw(self.screen, self.camera_offset)
+            
         # Draw player if not showing respawn button
         if not self.show_respawn:
             self.player.draw(self.screen, self.camera_offset)
@@ -416,6 +460,15 @@ class Game:
         shop_text = font.render("SHOP", True, (255, 255, 255))
         shop_text_rect = shop_text.get_rect(center=self.shop_button_rect.center)
         self.screen.blit(shop_text, shop_text_rect)
+        
+        # Draw music button
+        music_color = pygame.Color(0)
+        music_color.hsva = ((self.background_color + 240) % 360, 100, 100, 100)
+        pygame.draw.rect(self.screen, music_color, self.music_button_rect)
+        pygame.draw.rect(self.screen, (0, 0, 0), self.music_button_rect, 2)
+        music_text = font.render("MUTE" if not self.music_muted else "UNMUTE", True, (255, 255, 255))
+        music_text_rect = music_text.get_rect(center=self.music_button_rect.center)
+        self.screen.blit(music_text, music_text_rect)
         
         # Draw purchase message if active
         if self.show_purchase_message:
@@ -459,4 +512,23 @@ class Game:
         font = pygame.font.Font(None, 36)
         text = font.render("RESPAWN", True, (255, 255, 255))
         text_rect = text.get_rect(center=button_rect.center)
-        self.screen.blit(text, text_rect) 
+        self.screen.blit(text, text_rect)
+
+    def toggle_music(self):
+        try:
+            if self.music_muted:
+                # Unmute - resume playing
+                pygame.mixer.music.unpause()  # Unpause instead of setting volume
+                self.music_muted = False
+                self.show_purchase_message = True
+                self.purchase_message = "Music Unmuted!"
+                self.message_timer = 60
+            else:
+                # Mute - pause music
+                pygame.mixer.music.pause()  # Pause instead of setting volume to 0
+                self.music_muted = True
+                self.show_purchase_message = True
+                self.purchase_message = "Music Muted!"
+                self.message_timer = 60
+        except Exception as e:
+            print(f"Error toggling music: {str(e)}") 

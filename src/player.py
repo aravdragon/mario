@@ -200,12 +200,18 @@ class Player:
                 
                 # Draw trail segment
                 start_pos = (self.trail_positions[i][0] - camera_offset[0],
-                            self.trail_positions[i][1] - camera_offset[1])
+                             self.trail_positions[i][1] - camera_offset[1])
                 end_pos = (self.trail_positions[i + 1][0] - camera_offset[0],
-                          self.trail_positions[i + 1][1] - camera_offset[1])
+                           self.trail_positions[i + 1][1] - camera_offset[1])
                 pygame.draw.line(screen, color, start_pos, end_pos, thickness)
 
-        # Calculate screen position with camera offset
+        # Draw player as a color cycling RGB block with black features
+        # Create a color that cycles through RGB spectrum
+        self.color_timer = (self.color_timer + 2) % 360
+        player_color = pygame.Color(0)
+        player_color.hsva = (self.color_timer, 100, 100, 100)
+        
+        # Calculate position with camera offset
         draw_rect = pygame.Rect(
             self.rect.x - camera_offset[0],
             self.rect.y - camera_offset[1],
@@ -213,53 +219,44 @@ class Player:
             self.rect.height
         )
         
-        # Draw the player with RGB color cycling
-        self.color_timer = (self.color_timer + 2) % 360
-        color = pygame.Color(0)
-        color.hsva = (self.color_timer, 100, 100, 100)
-        pygame.draw.rect(screen, color, draw_rect)
+        # Draw the RGB cycling block
+        pygame.draw.rect(screen, player_color, draw_rect)
         
         # Draw black outline
-        pygame.draw.rect(screen, (0, 0, 0), draw_rect, 2)
+        pygame.draw.rect(screen, (0, 0, 0), draw_rect, 3)
         
-        # Draw health bar above player
-        health_width = draw_rect.width
-        health_height = 5
-        health_rect = pygame.Rect(draw_rect.x, draw_rect.y - 10, health_width, health_height)
+        # Add face features - all BLACK
+        eye_size = 8
+        eye_color = (0, 0, 0)  # Black eyes
+        mouth_color = (0, 0, 0)  # Black mouth
+        mouth_width = 20
+        mouth_height = 6
         
-        # Background of health bar
-        pygame.draw.rect(screen, (50, 50, 50), health_rect)
+        # Draw eyes - black squares
+        eye_padding = 7
+        left_eye_rect = pygame.Rect(
+            draw_rect.left + eye_padding, 
+            draw_rect.top + eye_padding,
+            eye_size, 
+            eye_size
+        )
+        right_eye_rect = pygame.Rect(
+            draw_rect.right - eye_padding - eye_size, 
+            draw_rect.top + eye_padding,
+            eye_size, 
+            eye_size
+        )
+        pygame.draw.rect(screen, eye_color, left_eye_rect)
+        pygame.draw.rect(screen, eye_color, right_eye_rect)
         
-        # Current health
-        current_health_width = int((self.health / 100) * health_width)
-        if current_health_width > 0:
-            current_health_rect = pygame.Rect(draw_rect.x, draw_rect.y - 10, current_health_width, health_height)
-            health_color = (0, 255, 0) if self.health > 50 else (255, 165, 0) if self.health > 25 else (255, 0, 0)
-            pygame.draw.rect(screen, health_color, current_health_rect)
-            
-        # Draw shield effect if active
-        if self.shield_active:
-            shield_rect = draw_rect.inflate(10, 10)
-            pygame.draw.rect(screen, (0, 191, 255), shield_rect, 2)
-            
-        # Draw jetpack flames if active
-        if hasattr(self, 'jetpack') and self.jetpack.is_active():
-            flame_height = 20
-            flame_width = 10
-            flame_x = draw_rect.centerx - flame_width // 2
-            flame_y = draw_rect.bottom
-            
-            # Create flickering flame effect
-            flame_points = [
-                (flame_x, flame_y),
-                (flame_x + flame_width, flame_y),
-                (flame_x + flame_width // 2, flame_y + flame_height + random.randint(-5, 5))
-            ]
-            
-            # Draw flame with RGB color
-            flame_color = pygame.Color(0)
-            flame_color.hsva = ((self.color_timer + 180) % 360, 100, 100, 100)
-            pygame.draw.polygon(screen, flame_color, flame_points)
+        # Draw mouth - black rectangle at bottom
+        mouth_rect = pygame.Rect(
+            draw_rect.centerx - mouth_width // 2,
+            draw_rect.bottom - eye_padding - mouth_height,
+            mouth_width,
+            mouth_height
+        )
+        pygame.draw.rect(screen, mouth_color, mouth_rect)
 
     def handle_collisions(self, platforms):
         # Handle horizontal collisions
