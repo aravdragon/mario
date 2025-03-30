@@ -7,10 +7,9 @@ class Shop:
         self.game = game
         self.show = False
         self.items = [
-            {"name": "Burger", "cost": 5, "description": "Speed boost + double jump for 1 minute"},
+            {"name": "Teleport", "cost": 20, "description": "Skip 5 blocks and collect all items along the way"},
             {"name": "Jetpack", "cost": 10, "description": "Permanent flying ability (Press F to fly)"},
             {"name": "Speed Boost", "cost": 15, "description": "2x speed for 20 minutes"},
-            {"name": "Shield", "cost": 20, "description": "Invincibility for 30 seconds"},
             {"name": "Magnet", "cost": 25, "description": "Attracts nearby coins for 10 seconds"},
             {"name": "Rainbow Trail", "cost": 30, "description": "Permanent rainbow trail effect"}
         ]
@@ -19,26 +18,21 @@ class Shop:
         self.small_font = pygame.font.Font(None, 24)
         self.powerup_timers = {}
         self.effects = {
-            "burger": self.apply_burger,
+            "teleport": self.apply_teleport,
             "jetpack": self.apply_jetpack,
             "speed_boost": self.apply_speed_boost,
-            "shield": self.apply_shield,
             "magnet": self.apply_magnet,
             "trail": self.apply_trail
         }
         self.item_rects = []
         self.magnet_pending = False
         
-    def apply_burger(self):
-        if self.game.score >= 5:
-            self.game.score -= 5
-            self.game.player.burger.active = True
-            self.game.player.burger.eaten = True  # Auto-eat the burger
-            self.game.player.burger.effect_timer = self.game.player.burger.max_effect_time
-            self.game.player.can_double_jump = True
-            self.powerup_timers["burger"] = time.time() + 60  # 1 minute
+    def apply_teleport(self):
+        if self.game.score >= 20:
+            self.game.score -= 20
+            self.game.teleport_available = True
             self.game.show_purchase_message = True
-            self.game.purchase_message = "Burger activated! Double jump for 1 minute"
+            self.game.purchase_message = "Teleport purchased! Click the TELEPORT button to use it"
             return True
         return False
         
@@ -60,16 +54,6 @@ class Shop:
             self.powerup_timers["speed_boost"] = time.time() + 1200  # 20 minutes
             self.game.show_purchase_message = True
             self.game.purchase_message = "Speed Boost activated! 2x speed for 20 minutes"
-            return True
-        return False
-        
-    def apply_shield(self):
-        if self.game.score >= 20:
-            self.game.score -= 20
-            self.game.player.shield_active = True
-            self.powerup_timers["shield"] = time.time() + 30  # 30 seconds
-            self.game.show_purchase_message = True
-            self.game.purchase_message = "Shield activated! Invincible for 30 seconds"
             return True
         return False
         
@@ -98,13 +82,8 @@ class Shop:
         # Update powerup timers
         for powerup, end_time in self.powerup_timers.items():
             if end_time > 0 and current_time > end_time:
-                if powerup == "burger":
-                    self.game.player.burger.active = False
-                    self.game.player.can_double_jump = False
-                elif powerup == "speed_boost":
+                if powerup == "speed_boost":
                     self.game.player.powerups["speed_boost"] = False
-                elif powerup == "shield":
-                    self.game.player.shield_active = False
                 elif powerup == "magnet":
                     self.game.player.powerups["magnet"] = False
                 self.powerup_timers[powerup] = 0
@@ -131,14 +110,12 @@ class Shop:
                 for i, rect in enumerate(self.item_rects):
                     if rect.collidepoint(mouse_pos) and i < len(self.items):
                         item = self.items[i]
-                        if item["name"] == "Burger" and self.game.score >= item["cost"]:
-                            self.apply_burger()
+                        if item["name"] == "Teleport" and self.game.score >= item["cost"]:
+                            self.apply_teleport()
                         elif item["name"] == "Jetpack" and self.game.score >= item["cost"]:
                             self.apply_jetpack()
                         elif item["name"] == "Speed Boost" and self.game.score >= item["cost"]:
                             self.apply_speed_boost()
-                        elif item["name"] == "Shield" and self.game.score >= item["cost"]:
-                            self.apply_shield()
                         elif item["name"] == "Magnet" and self.game.score >= item["cost"]:
                             self.apply_magnet()
                         elif item["name"] == "Rainbow Trail" and self.game.score >= item["cost"]:
@@ -168,14 +145,12 @@ class Shop:
         
         # Shop items with prices and effects
         items = [
-            {"name": "Burger", "price": 5, "effect": "burger", 
-             "description": "Speed boost + double jump for 1 minute"},
+            {"name": "Teleport", "price": 20, "effect": "teleport",
+             "description": "Skip 5 blocks and collect all items along the way"},
             {"name": "Jetpack", "price": 10, "effect": "jetpack",
              "description": "Permanent flying ability (Press F to fly)"},
             {"name": "Speed Boost", "price": 15, "effect": "speed_boost",
              "description": "2x speed for 20 minutes"},
-            {"name": "Shield", "price": 20, "effect": "shield",
-             "description": "Invincibility for 30 seconds"},
             {"name": "Magnet", "price": 25, "effect": "magnet",
              "description": "Attracts nearby coins for 10 seconds"},
             {"name": "Rainbow Trail", "price": 30, "effect": "trail",
@@ -226,7 +201,8 @@ class Shop:
             
             # Show if item is active/purchased
             if (item["effect"] == "jetpack" and self.game.player.jetpack.purchased) or \
-               (item["effect"] == "trail" and self.game.player.powerups.get("trail", False)):
+               (item["effect"] == "trail" and self.game.player.powerups.get("trail", False)) or \
+               (item["effect"] == "teleport" and self.game.teleport_available):
                 status_text = self.small_font.render("PURCHASED", True, (0, 150, 0))
                 screen.blit(status_text, (x + 400, y + 45))
             elif item["effect"] in self.powerup_timers and self.powerup_timers[item["effect"]] > time.time():
@@ -254,18 +230,10 @@ class Shop:
         screen.blit(exit_text, exit_text_rect)
         
         # Draw current coins
-        coins_color = pygame.Color(0)
-        coins_color.hsva = ((self.game.background_color + 240) % 360, 100, 100, 100)
-        coins_text = self.font.render(f"Your Coins: {self.game.score}", True, coins_color)
-        coins_rect = coins_text.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT - 30))
-        
-        # Draw coins text outline
-        for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
-            outline_coins = self.font.render(f"Your Coins: {self.game.score}", True, (0, 0, 0))
-            screen.blit(outline_coins, (coins_rect.x + dx, coins_rect.y + dy))
+        coins_text = self.font.render(f"Your Coins: {self.game.score}", True, (0, 0, 0))
+        coins_rect = coins_text.get_rect(topleft=(20, 20))
         screen.blit(coins_text, coins_rect)
-
+        
     def handle_event(self, event):
-        if event.type == pygame.USEREVENT + 1:
-            self.game.player.powerups["magnet"] = False
-            pygame.time.set_timer(pygame.USEREVENT + 1, 0)  # Stop timer 
+        self.handle_input(event)
+        return True 

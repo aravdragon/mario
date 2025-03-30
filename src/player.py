@@ -3,6 +3,7 @@ from .constants import *
 from .jetpack import Jetpack
 from .burger import Burger
 import random
+import math
 
 # Constants
 PLAYER_WIDTH = 40
@@ -17,174 +18,176 @@ PLAYER_FRICTION = 0.9
 class Player:
     def __init__(self, x, y, game):
         self.rect = pygame.Rect(x, y, PLAYER_WIDTH, PLAYER_HEIGHT)
-        self.x_vel = 0
-        self.y_vel = 0
+        self.velocity_x = 0
+        self.velocity_y = 0
         self.mask = None
         self.fall_count = 0
-        self.jump_count = 0
-        self.hit = False
-        self.hit_count = 0
-        self.on_ground = False
+        self.direction = "left"
+        self.animation_count = 0
         self.is_jumping = False
-        self.just_jumped = False
+        self.on_ground = False
+        self.burger = Burger()
+        self.jetpack = Jetpack()
+        self.magnet_active = False
+        self.magnet_radius = 1000  # Increased from 200 to 1000
+        self.magnet_strength = 15  # Increased from 5 to 15
+        self.magnet_timer = 0
+        self.magnet_duration = 600  # 10 seconds at 60 FPS
+        self.facing_right = True
+        self.coyote_timer = 0
         self.can_double_jump = False
+        self.game = game
+        self.current_platforms = []
+        self.color_timer = 0
+        self.trail_positions = []
+        self.trail_update_timer = 0
+        self.powerups = {}
+        self.last_ground_y = y  # Track last ground position for fall detection
         self.health = 100
         self.shield_active = False
         self.shield_timer = 0
-        self.current_platforms = []
-        self.color_timer = 0
-        self.trail_positions = []  # Store positions for trail
-        self.powerups = {}
-        self.color = (255, 255, 255)  # White color for player
-        self.jetpack = Jetpack()
-        self.burger = Burger()
-        self.facing_right = True
-        self.coyote_timer = 0
+        self.just_jumped = False
         self.jump_buffer_timer = 0
-        self.last_ground_y = y
-        self.game = game
 
     def update(self, platforms):
-        # Store previous position for trail
-        if self.powerups.get("trail", False) and (abs(self.x_vel) > 0.1 or abs(self.y_vel) > 0.1):
-            self.trail_positions.append((self.rect.centerx, self.rect.centery))
-            # Keep only last 75 pixels worth of positions
-            while len(self.trail_positions) > 0:
-                if abs(self.trail_positions[-1][0] - self.trail_positions[0][0]) > 75 or \
-                   abs(self.trail_positions[-1][1] - self.trail_positions[0][1]) > 75:
-                    self.trail_positions.pop(0)
-                else:
-                    break
-        else:
-            self.trail_positions = []
-
+        # Store previous position for collision resolution
+        old_x = self.rect.x
+        old_y = self.rect.y
+        
+        # Get keyboard input
         keys = pygame.key.get_pressed()
         
         # Calculate base speed with powerups
         current_speed = PLAYER_SPEED
         if self.powerups.get("speed_boost", False):
-            current_speed *= 2.0  # Double speed with speed boost
+            current_speed *= SPEED_BOOST_MULTIPLIER
         if self.burger.active:
-            current_speed *= 1.5  # 50% speed increase with burger
-
-        # Get jetpack thrust
-        if self.jetpack.purchased and (keys[pygame.K_f] or keys[pygame.K_LSHIFT]):
-            jetpack_dx = 0
-            jetpack_dy = -1.0 if self.jetpack.fuel > 0 else 0
-            if self.jetpack.permanent or self.jetpack.fuel > 0:
-                self.jetpack.activate(True)
-        else:
-            jetpack_dx = 0
-            jetpack_dy = 0
+            current_speed *= BURGER_SPEED_MULTIPLIER
             
-        # Horizontal movement with acceleration
+        # Horizontal movement
         if keys[pygame.K_a] or keys[pygame.K_LEFT]:
-            self.x_vel = max(self.x_vel - PLAYER_ACCELERATION, -current_speed)
+            self.velocity_x = max(self.velocity_x - PLAYER_ACCELERATION, -current_speed)
             self.facing_right = False
         elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-            self.x_vel = min(self.x_vel + PLAYER_ACCELERATION, current_speed)
+            self.velocity_x = min(self.velocity_x + PLAYER_ACCELERATION, current_speed)
             self.facing_right = True
         else:
             # Apply friction
-            self.x_vel *= PLAYER_FRICTION
-            if abs(self.x_vel) < 0.1:
-                self.x_vel = 0
-
-        # Add jetpack horizontal thrust
-        self.x_vel += jetpack_dx
-
+            self.velocity_x *= PLAYER_FRICTION
+            if abs(self.velocity_x) < 0.1:
+                self.velocity_x = 0
+                
         # Update coyote time
         if self.on_ground:
             self.coyote_timer = COYOTE_TIME
-            self.last_ground_y = self.rect.bottom
-            self.can_double_jump = True  # Reset double jump when on ground
+            self.last_ground_y = self.rect.y
+            self.can_double_jump = True
         else:
             self.coyote_timer = max(0, self.coyote_timer - 1)
-
+            
         # Handle jumping
         if keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]:
             if self.on_ground or self.coyote_timer > 0:
-                self.y_vel = JUMP_FORCE
+                self.velocity_y = JUMP_FORCE
                 self.is_jumping = True
                 self.on_ground = False
                 self.coyote_timer = 0
-            elif self.burger.active and not self.can_double_jump:  # Double jump with burger
-                self.y_vel = JUMP_FORCE * 0.8  # Slightly weaker second jump
-                self.can_double_jump = True  # Prevent more than double jump
-
-        # Apply gravity and jetpack vertical thrust
+            elif self.burger.active and not self.can_double_jump:
+                self.velocity_y = JUMP_FORCE * 0.8
+                self.can_double_jump = True
+                
+        # Apply gravity
         if not self.on_ground:
-            self.y_vel += GRAVITY
-            if self.y_vel > MAX_FALL_SPEED:
-                self.y_vel = MAX_FALL_SPEED
-
-        # Add jetpack vertical thrust
-        self.y_vel += jetpack_dy * 0.8  # Reduced jetpack power for better control
-
+            self.velocity_y += GRAVITY
+            if self.velocity_y > MAX_FALL_SPEED:
+                self.velocity_y = MAX_FALL_SPEED
+                
+        # Apply jetpack thrust if available
+        if keys[pygame.K_f] and self.jetpack.purchased:
+            self.jetpack.activate(True)
+            h_thrust, v_thrust = self.jetpack.get_thrust(keys)
+            self.velocity_x += h_thrust
+            self.velocity_y += v_thrust
+        else:
+            if hasattr(self, 'jetpack'):
+                self.jetpack.activate(False)
+            
         # Update jetpack
-        self.jetpack.update()
-
-        # Move and check collisions
+        if hasattr(self, 'jetpack'):
+            self.jetpack.update()
+        
+        # Handle movement and collisions
         self.handle_movement(platforms)
-
+        
+        # Track position for trail effect
+        if self.powerups.get("trail", False):
+            # Only add trail points if player is moving
+            if abs(self.velocity_x) > 0.5 or abs(self.velocity_y) > 0.5:
+                self.trail_update_timer += 1
+                if self.trail_update_timer >= 2:
+                    self.trail_positions.append((self.rect.centerx, self.rect.centery))
+                    self.trail_update_timer = 0
+                    
+                    # Limit trail length to 100 pixels
+                    while len(self.trail_positions) > 1:
+                        # Check if oldest point is more than 100 pixels away from newest point
+                        newest = self.trail_positions[-1]
+                        oldest = self.trail_positions[0]
+                        distance = ((newest[0] - oldest[0])**2 + (newest[1] - oldest[1])**2)**0.5
+                        if distance > 100:
+                            self.trail_positions.pop(0)
+                        else:
+                            break
+            else:
+                # Clear trail when not moving
+                self.trail_positions = []
+        
         # Update magnet ability
         if self.powerups.get("magnet", False):
-            for coin in self.game.coins[:]:
-                dx = self.rect.centerx - coin.rect.centerx
-                dy = self.rect.centery - coin.rect.centery
-                dist = (dx * dx + dy * dy) ** 0.5
-                if dist < 100000:  # Extended range to 100000 pixels
-                    speed = 15  # Faster coin movement
-                    coin.rect.x += (dx / dist) * speed
-                    coin.rect.y += (dy / dist) * speed
+            self.magnet_active = True
+            self.magnet_timer = self.magnet_duration  # Reset timer when powerup is collected
+            # Remove the powerup after activation
+            self.powerups["magnet"] = False
+        
+        # Update magnet timer
+        if self.magnet_timer > 0:
+            self.magnet_timer -= 1
+            self.magnet_active = True
+        else:
+            self.magnet_active = False
+            
+        # Update the burger
+        self.burger.update()
 
     def handle_movement(self, platforms):
         # Move horizontally
-        self.rect.x += int(self.x_vel)
+        self.rect.x += int(self.velocity_x)
         
         # Handle horizontal collisions
         for platform in platforms:
             if self.rect.colliderect(platform.rect):
-                if self.x_vel > 0:  # Moving right
+                if self.velocity_x > 0:  # Moving right
                     self.rect.right = platform.rect.left
-                elif self.x_vel < 0:  # Moving left
+                    self.velocity_x = 0
+                elif self.velocity_x < 0:  # Moving left
                     self.rect.left = platform.rect.right
-                self.x_vel = 0
+                    self.velocity_x = 0
         
         # Move vertically
-        self.rect.y += int(self.y_vel)
+        self.rect.y += int(self.velocity_y)
         self.on_ground = False
         
         # Handle vertical collisions
         for platform in platforms:
             if self.rect.colliderect(platform.rect):
-                if self.y_vel > 0:  # Moving down
+                if self.velocity_y > 0:  # Moving down
                     self.rect.bottom = platform.rect.top
-                    self.y_vel = 0
+                    self.velocity_y = 0
                     self.on_ground = True
                     self.is_jumping = False
-                elif self.y_vel < 0:  # Moving up
+                elif self.velocity_y < 0:  # Moving up
                     self.rect.top = platform.rect.bottom
-                    self.y_vel = 0
-
-    def handle_input(self, event):
-        if event.type == pygame.KEYDOWN:
-            if event.key in [pygame.K_SPACE, pygame.K_UP, pygame.K_w]:
-                if self.on_ground or self.coyote_timer > 0:
-                    self.y_vel = JUMP_FORCE
-                    self.is_jumping = True
-                    self.on_ground = False
-                    self.coyote_timer = 0
-                elif self.burger.active and not self.can_double_jump:  # Double jump with burger
-                    self.y_vel = JUMP_FORCE * 0.8  # Slightly weaker second jump
-                    self.can_double_jump = True  # Prevent more than double jump
-                
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:  # Left click
-                if self.burger.active and not self.burger.eaten:
-                    if self.burger.eat_button_rect.collidepoint(event.pos):
-                        if self.burger.eat():
-                            self.can_double_jump = True
+                    self.velocity_y = 0
 
     def draw(self, screen, camera_offset):
         # Draw rainbow trail if active
@@ -205,11 +208,8 @@ class Player:
                            self.trail_positions[i + 1][1] - camera_offset[1])
                 pygame.draw.line(screen, color, start_pos, end_pos, thickness)
 
-        # Draw player as a color cycling RGB block with black features
-        # Create a color that cycles through RGB spectrum
+        # Create a color cycling RGB block for drippy style
         self.color_timer = (self.color_timer + 2) % 360
-        player_color = pygame.Color(0)
-        player_color.hsva = (self.color_timer, 100, 100, 100)
         
         # Calculate position with camera offset
         draw_rect = pygame.Rect(
@@ -219,64 +219,165 @@ class Player:
             self.rect.height
         )
         
-        # Draw the RGB cycling block
-        pygame.draw.rect(screen, player_color, draw_rect)
+        # Draw solid colored square (Geometry Dash style)
+        main_color = pygame.Color(0)
+        main_color.hsva = (self.color_timer, 80, 100, 100)
+        pygame.draw.rect(screen, main_color, draw_rect)
         
-        # Draw black outline
-        pygame.draw.rect(screen, (0, 0, 0), draw_rect, 3)
+        # Draw black border (Geometry Dash style)
+        pygame.draw.rect(screen, (0, 0, 0), draw_rect, 2)
         
-        # Add face features - all BLACK
-        eye_size = 8
+        # GEOMETRY DASH FACE
+        
+        # Draw simple geometric eyes (squares with black eyes)
+        eye_size = 10  # Slightly larger eyes
+        eye_padding = 9
         eye_color = (0, 0, 0)  # Black eyes
-        mouth_color = (0, 0, 0)  # Black mouth
-        mouth_width = 20
-        mouth_height = 6
         
-        # Draw eyes - black squares
-        eye_padding = 7
+        # Left eye
         left_eye_rect = pygame.Rect(
-            draw_rect.left + eye_padding, 
+            draw_rect.left + eye_padding,
             draw_rect.top + eye_padding,
-            eye_size, 
-            eye_size
-        )
-        right_eye_rect = pygame.Rect(
-            draw_rect.right - eye_padding - eye_size, 
-            draw_rect.top + eye_padding,
-            eye_size, 
+            eye_size,
             eye_size
         )
         pygame.draw.rect(screen, eye_color, left_eye_rect)
+        
+        # Right eye
+        right_eye_rect = pygame.Rect(
+            draw_rect.right - eye_padding - eye_size,
+            draw_rect.top + eye_padding,
+            eye_size,
+            eye_size
+        )
         pygame.draw.rect(screen, eye_color, right_eye_rect)
         
-        # Draw mouth - black rectangle at bottom
+        # CLEAR SMILE - Simple rectangular smile (Geometry Dash style)
+        mouth_width = 22
+        mouth_height = 5
+        mouth_y = draw_rect.top + draw_rect.height * 2 // 3
+        
+        # Create a simple rectangular smile
         mouth_rect = pygame.Rect(
             draw_rect.centerx - mouth_width // 2,
-            draw_rect.bottom - eye_padding - mouth_height,
+            mouth_y,
             mouth_width,
             mouth_height
         )
-        pygame.draw.rect(screen, mouth_color, mouth_rect)
+        pygame.draw.rect(screen, (0, 0, 0), mouth_rect)  # Black rectangular smile
+        
+        # Add speed effect when moving
+        if abs(self.velocity_x) > 1 or abs(self.velocity_y) > 1:
+            # Draw motion lines behind character
+            line_color = pygame.Color(0)
+            line_color.hsva = ((self.color_timer + 30) % 360, 60, 100, 100)
+            
+            # Draw 3 motion lines when moving
+            for i in range(3):
+                offset = 5 + i * 4
+                line_y_offset = i * 5 - 5
+                
+                # Horizontal motion lines when moving sideways
+                if abs(self.velocity_x) > 1:
+                    direction = -1 if self.velocity_x > 0 else 1
+                    pygame.draw.line(
+                        screen,
+                        line_color,
+                        (draw_rect.centerx + direction * offset, draw_rect.centery + line_y_offset),
+                        (draw_rect.centerx + direction * (offset + 8), draw_rect.centery + line_y_offset),
+                        2
+                    )
+        
+        # Add powerup effects - minimal clean style
+        if self.powerups.get("speed_boost", False):
+            # Draw speed aura
+            aura_color = pygame.Color(0)
+            aura_color.hsva = ((self.color_timer + 180) % 360, 80, 100, 70)  # Semi-transparent
+            
+            # Draw aura around character
+            aura_rect = draw_rect.inflate(6, 6)
+            pygame.draw.rect(screen, aura_color, aura_rect, 2)
+
+    def draw_star(self, screen, center, size, color, points=5):
+        """Draw a star shape centered at the given position"""
+        outer_points = []
+        inner_points = []
+        
+        for i in range(points * 2):
+            angle = math.pi * i / points
+            radius = size if i % 2 == 0 else size / 2
+            x = center[0] + radius * math.sin(angle)
+            y = center[1] + radius * math.cos(angle)
+            
+            if i % 2 == 0:
+                outer_points.append((x, y))
+            else:
+                inner_points.append((x, y))
+                
+        # Combine the points alternating outer and inner
+        star_points = []
+        for i in range(points):
+            star_points.append(outer_points[i])
+            star_points.append(inner_points[i])
+            
+        pygame.draw.polygon(screen, color, star_points)
+    
+    def draw_zigzag(self, screen, start, end, segments, height, color, thickness=1):
+        """Draw a zigzag line between start and end points"""
+        points = [start]
+        
+        # Calculate segment length
+        segment_length = (end[0] - start[0]) / segments
+        
+        # Create zigzag points
+        for i in range(1, segments):
+            x = start[0] + segment_length * i
+            y = start[1] + (height if i % 2 == 1 else -height)
+            points.append((x, y))
+            
+        points.append(end)
+        
+        # Draw the zigzag line
+        pygame.draw.lines(screen, color, False, points, thickness)
+
+    def handle_input(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key in [pygame.K_SPACE, pygame.K_UP, pygame.K_w]:
+                if self.on_ground or self.coyote_timer > 0:
+                    self.velocity_y = JUMP_FORCE
+                    self.is_jumping = True
+                    self.on_ground = False
+                    self.coyote_timer = 0
+                elif self.burger.active and not self.can_double_jump:  # Double jump with burger
+                    self.velocity_y = JUMP_FORCE * 0.8  # Slightly weaker second jump
+                    self.can_double_jump = True  # Prevent more than double jump
+                
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:  # Left click
+                if self.burger.active and not self.burger.eaten:
+                    if self.burger.eat_button_rect.collidepoint(event.pos):
+                        if self.burger.eat():
+                            self.can_double_jump = True
 
     def handle_collisions(self, platforms):
         # Handle horizontal collisions
         for platform in platforms:
             if self.rect.colliderect(platform.rect):
-                if self.x_vel > 0:  # Moving right
+                if self.velocity_x > 0:  # Moving right
                     self.rect.right = platform.rect.left
-                    self.x_vel = 0
-                elif self.x_vel < 0:  # Moving left
+                    self.velocity_x = 0
+                elif self.velocity_x < 0:  # Moving left
                     self.rect.left = platform.rect.right
-                    self.x_vel = 0
+                    self.velocity_x = 0
                     
         # Handle vertical collisions
         self.on_ground = False
         for platform in platforms:
             if self.rect.colliderect(platform.rect):
-                if self.y_vel > 0:  # Moving down
+                if self.velocity_y > 0:  # Moving down
                     self.rect.bottom = platform.rect.top
-                    self.y_vel = 0
+                    self.velocity_y = 0
                     self.on_ground = True
-                elif self.y_vel < 0:  # Moving up
+                elif self.velocity_y < 0:  # Moving up
                     self.rect.top = platform.rect.bottom
-                    self.y_vel = 0 
+                    self.velocity_y = 0 

@@ -14,13 +14,14 @@ class Jetpack:
         self.active = False
         self.fuel_consumption_rate = 0.2  # Reduced fuel consumption
         self.fuel_recovery_rate = 0.4  # Increased fuel recovery
-        self.vertical_thrust = 2.0  # Increased vertical thrust
-        self.horizontal_thrust = 1.0  # Increased horizontal thrust
+        self.vertical_thrust = 0.8  # Increased vertical thrust but not too much
+        self.horizontal_thrust = 0.6  # Increased horizontal thrust
         self.particles = []
         self.fly_button_rect = pygame.Rect(10, 60, 80, 40)
         self.color_timer = 0
 
     def update(self):
+        # Update timer if jetpack is active
         if self.purchased and self.active:
             if self.time_remaining > 0:
                 self.time_remaining -= 1
@@ -28,10 +29,13 @@ class Jetpack:
                     self.purchased = False
                     self.permanent = False
             
+            # Consume fuel when active
             if not self.permanent:
-                self.fuel = max(0, self.fuel - 0.5)  # Consume fuel
-            elif self.fuel < self.max_fuel:
-                self.fuel = min(self.max_fuel, self.fuel + 0.25)  # Recover fuel when not in use
+                self.fuel = max(0, self.fuel - self.fuel_consumption_rate)
+        
+        # Recover fuel when not active
+        elif self.purchased and self.fuel < self.max_fuel:
+            self.fuel = min(self.max_fuel, self.fuel + self.fuel_recovery_rate)
 
         # Update particles
         for particle in self.particles[:]:
@@ -41,20 +45,18 @@ class Jetpack:
                 
         # Generate new particles when active
         if self.active and (self.permanent or self.fuel > 0):
-            self.particles.append({
-                'x': random.randint(-10, 10),
-                'y': random.randint(5, 15),
-                'life': 20
-            })
+            self.generate_particles()
 
     def activate(self, button_pressed):
+        # Only activate if purchased and has time remaining
         if self.purchased and self.time_remaining > 0:
+            # Only activate if permanent or has fuel
             self.active = button_pressed and (self.permanent or self.fuel > 0)
         else:
             self.active = False
 
     def is_active(self):
-        return self.active and self.time_remaining > 0
+        return self.active and self.purchased and self.time_remaining > 0 and (self.permanent or self.fuel > 0)
 
     def get_time_remaining(self):
         minutes = self.time_remaining // 3600
@@ -62,17 +64,17 @@ class Jetpack:
         return f"{minutes}:{seconds:02d}"
 
     def get_thrust(self, keys):
-        if not self.active or (not self.permanent and self.fuel <= 0):
+        if not self.is_active():
             return 0, 0
             
-        # Calculate vertical thrust
-        vertical = -self.vertical_thrust if keys[pygame.K_f] else 0
+        # Calculate vertical thrust (upward force)
+        vertical = -self.vertical_thrust  # Always apply upward thrust when active
         
         # Calculate horizontal thrust based on A/D keys
         horizontal = 0
-        if keys[pygame.K_a]:
+        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
             horizontal = -self.horizontal_thrust
-        elif keys[pygame.K_d]:
+        elif keys[pygame.K_d] or keys[pygame.K_RIGHT]:
             horizontal = self.horizontal_thrust
             
         return horizontal, vertical
@@ -116,7 +118,7 @@ class Jetpack:
                 pygame.draw.rect(screen, color, (gauge_x, gauge_y, fuel_width, gauge_height))
                 
         # Draw jetpack flames
-        if self.active and (self.permanent or self.fuel > 0):
+        if self.is_active():
             for particle in self.particles:
                 pos_x = rect.centerx + particle['x']
                 pos_y = rect.bottom + particle['y']
@@ -130,11 +132,20 @@ class Jetpack:
             self.color_timer = (self.color_timer + 2) % 360
 
     def can_fly(self):
-        return self.purchased and (self.permanent or self.fuel > 0)
+        return self.purchased and self.time_remaining > 0 and (self.permanent or self.fuel > 0)
 
     def purchase(self):
         self.purchased = True
         self.permanent = False  # Make jetpack temporary (2 minutes)
         self.time_remaining = 7200  # Reset to 2 minutes when purchased
         self.fuel = self.max_fuel
-        return True 
+        return True
+
+    def generate_particles(self):
+        # Add 1-3 new particles
+        for _ in range(random.randint(1, 3)):
+            self.particles.append({
+                'x': random.randint(-10, 10),
+                'y': random.randint(5, 15),
+                'life': random.randint(15, 25)
+            }) 
