@@ -1,4 +1,4 @@
-# RGB GlowingBlock Adventure
+# santinel
 
 A Mario-style platformer game featuring an RGB glowing block as the main character. Collect coins, buy power-ups, and survive as long as you can on shrinking platforms!
 

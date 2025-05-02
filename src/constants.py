@@ -30,9 +30,9 @@ MAX_FALL_SPEED = 15
 COYOTE_TIME = 6
 
 # Platform settings
-PLATFORM_HEIGHT = 40
-PLATFORM_MIN_WIDTH = 100
-PLATFORM_MAX_WIDTH = 200
+PLATFORM_HEIGHT = 15
+PLATFORM_MIN_WIDTH = 75
+PLATFORM_MAX_WIDTH = 75
 MIN_PLATFORM_SPACING = 200
 MAX_PLATFORM_SPACING = 350
 SHRINK_RATE = 0.05
@@ -48,11 +48,11 @@ JETPACK_HORIZONTAL_BOOST = 1.2
 # Shop items
 SHOP_ITEMS = [
     {"name": "Burger", "price": 5, "effect": "burger", "description": "Speed boost + double jump (1 min)"},
-    {"name": "Jetpack", "price": 10, "effect": "jetpack", "description": "Fly and move smoothly (permanent)"},
-    {"name": "Speed Boost", "price": 15, "effect": "speed_boost", "description": "2x speed (20 min)"},
+    {"name": "Levitation", "price": 1000, "effect": "jetpack", "description": "Fly and move smoothly (permanent)"},
+    {"name": "Speed Boost", "price": 100, "effect": "speed_boost", "description": "2x speed (20 min)"},
     {"name": "Shield", "price": 20, "effect": "shield", "description": "Invincibility (30 sec)"},
-    {"name": "Magnet", "price": 25, "effect": "magnet", "description": "Attract coins (1 min)"},
-    {"name": "Rainbow Trail", "price": 30, "effect": "trail", "description": "Leave a rainbow trail (permanent)"}
+    {"name": "Magnet", "price": 60, "effect": "magnet", "description": "Attract coins (1 min)"},
+    {"name": "Rainbow Trail", "price": 25, "effect": "trail", "description": "Leave a rainbow trail (permanent)"}
 ]
 
 # Powerup settings

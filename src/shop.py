@@ -7,11 +7,11 @@ class Shop:
         self.game = game
         self.show = False
         self.items = [
-            {"name": "Teleport", "cost": 20, "description": "Skip 5 blocks and collect all items along the way"},
-            {"name": "Jetpack", "cost": 10, "description": "Permanent flying ability (Press F to fly)"},
-            {"name": "Speed Boost", "cost": 15, "description": "2x speed for 20 minutes"},
-            {"name": "Magnet", "cost": 25, "description": "Attracts nearby coins for 10 seconds"},
-            {"name": "Rainbow Trail", "cost": 30, "description": "Permanent rainbow trail effect"}
+            {"name": "Teleport", "cost": 30, "description": "Skip 5 blocks and collect all items along the way"},
+            {"name": "Levitation", "cost": 1000, "description": "Permanent flying ability (Press F to fly)"},
+            {"name": "Speed Boost", "cost": 100, "description": "2x speed for 20 minutes"},
+            {"name": "Magnet", "cost": 60, "description": "Attracts nearby coins for 10 seconds"},
+            {"name": "Rainbow Trail", "cost": 25, "description": "Permanent rainbow trail effect"}
         ]
         self.selected_item = None
         self.font = pygame.font.Font(None, 36)
@@ -28,28 +28,33 @@ class Shop:
         self.magnet_pending = False
         
     def apply_teleport(self):
-        if self.game.score >= 20:
-            self.game.score -= 20
+        if self.game.score >= 30:
+            self.game.score -= 30
             self.game.teleport_available = True
             self.game.show_purchase_message = True
-            self.game.purchase_message = "Teleport purchased! Click the TELEPORT button to use it"
+            self.game.purchase_message = "Teleport purchased! Click the TELEPORT button to use it."
+            self.game.message_timer = 180
             return True
-        return False
+        else:
+            self.game.show_purchase_message = True
+            self.game.purchase_message = "Not enough coins for Teleport!"
+            self.game.message_timer = 180
+            return False
         
     def apply_jetpack(self):
-        if self.game.score >= 10:
-            self.game.score -= 10
+        if self.game.score >= 1000:
+            self.game.score -= 1000
             self.game.player.jetpack.purchased = True
             self.game.player.jetpack.fuel = 100  # Full fuel
             self.game.player.jetpack.permanent = True  # Make jetpack permanent
             self.game.show_purchase_message = True
-            self.game.purchase_message = "Jetpack purchased! Press F to fly (permanent)"
+            self.game.purchase_message = "Levitation purchased! Press F to fly (permanent)"
             return True
         return False
         
     def apply_speed_boost(self):
-        if self.game.score >= 15:
-            self.game.score -= 15
+        if self.game.score >= 100:
+            self.game.score -= 100
             self.game.player.powerups["speed_boost"] = True
             self.powerup_timers["speed_boost"] = time.time() + 1200  # 20 minutes
             self.game.show_purchase_message = True
@@ -58,18 +63,24 @@ class Shop:
         return False
         
     def apply_magnet(self):
-        if self.game.score >= 25:
-            self.game.score -= 25
+        if self.game.score >= 60:
+            self.game.score -= 60
+            self.game.player.powerups["magnet"] = True
+            self.game.player.magnet_active = True
+            self.game.player.magnet_timer = self.game.player.magnet_duration
             self.game.show_purchase_message = True
-            self.game.purchase_message = "Magnet purchased! Will activate for 10 seconds when shop closes."
+            self.game.purchase_message = "Magnet activated! Attracting coins for 10 seconds."
             self.game.message_timer = 180
-            self.magnet_pending = True
             return True
-        return False
+        else:
+            self.game.show_purchase_message = True
+            self.game.purchase_message = "Not enough coins for Magnet!"
+            self.game.message_timer = 180
+            return False
         
     def apply_trail(self):
-        if self.game.score >= 30:
-            self.game.score -= 30
+        if self.game.score >= 25:
+            self.game.score -= 25
             self.game.player.powerups["trail"] = True
             self.game.show_purchase_message = True
             self.game.purchase_message = "Rainbow Trail activated! Permanent effect"
@@ -87,12 +98,6 @@ class Shop:
                 elif powerup == "magnet":
                     self.game.player.powerups["magnet"] = False
                 self.powerup_timers[powerup] = 0
-        
-        # Activate magnet when shop closes
-        if not self.game.show_shop and self.magnet_pending:
-            self.magnet_pending = False
-            self.game.player.powerups["magnet"] = True
-            self.powerup_timers["magnet"] = time.time() + 10  # 10 seconds timer
         
     def handle_input(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -112,7 +117,7 @@ class Shop:
                         item = self.items[i]
                         if item["name"] == "Teleport" and self.game.score >= item["cost"]:
                             self.apply_teleport()
-                        elif item["name"] == "Jetpack" and self.game.score >= item["cost"]:
+                        elif item["name"] == "Levitation" and self.game.score >= item["cost"]:
                             self.apply_jetpack()
                         elif item["name"] == "Speed Boost" and self.game.score >= item["cost"]:
                             self.apply_speed_boost()
@@ -145,15 +150,15 @@ class Shop:
         
         # Shop items with prices and effects
         items = [
-            {"name": "Teleport", "price": 20, "effect": "teleport",
+            {"name": "Teleport", "price": 30, "effect": "teleport",
              "description": "Skip 5 blocks and collect all items along the way"},
-            {"name": "Jetpack", "price": 10, "effect": "jetpack",
+            {"name": "Levitation", "price": 1000, "effect": "jetpack",
              "description": "Permanent flying ability (Press F to fly)"},
-            {"name": "Speed Boost", "price": 15, "effect": "speed_boost",
+            {"name": "Speed Boost", "price": 100, "effect": "speed_boost",
              "description": "2x speed for 20 minutes"},
-            {"name": "Magnet", "price": 25, "effect": "magnet",
+            {"name": "Magnet", "price": 60, "effect": "magnet",
              "description": "Attracts nearby coins for 10 seconds"},
-            {"name": "Rainbow Trail", "price": 30, "effect": "trail",
+            {"name": "Rainbow Trail", "price": 25, "effect": "trail",
              "description": "Permanent rainbow trail effect"}
         ]
         
@@ -163,7 +168,7 @@ class Shop:
             x = WINDOW_WIDTH // 2 - 250
             y = 120 + i * 90
             
-            # Create item rectangle
+            # Create item rectangle - make it wider to fit text better
             item_rect = pygame.Rect(x, y, 500, 80)
             self.item_rects.append(item_rect)
             
@@ -175,7 +180,7 @@ class Shop:
             text_color = pygame.Color(0)
             text_color.hsva = ((self.game.background_color + i * 60) % 360, 100, 100, 100)
             
-            # Draw item name with RGB effect
+            # Draw item name with RGB effect - use smaller font to ensure it fits
             name_text = self.font.render(item["name"], True, text_color)
             name_rect = name_text.get_rect(x=x + 10, y=y + 5)
             
@@ -185,9 +190,9 @@ class Shop:
                 screen.blit(outline_name, (name_rect.x + dx, name_rect.y + dy))
             screen.blit(name_text, name_rect)
             
-            # Draw price
+            # Draw price - adjust position to ensure it stays in bounds
             price_text = self.font.render(f"{item['price']} coins", True, text_color)
-            price_rect = price_text.get_rect(x=x + 400, y=y + 5)
+            price_rect = price_text.get_rect(right=x + 490, y=y + 5)  # Align to right edge with margin
             
             # Draw price outline
             for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
@@ -195,9 +200,10 @@ class Shop:
                 screen.blit(outline_price, (price_rect.x + dx, price_rect.y + dy))
             screen.blit(price_text, price_rect)
             
-            # Draw description
+            # Draw description - make sure description doesn't overflow
             desc_text = self.small_font.render(item["description"], True, (100, 100, 100))
-            screen.blit(desc_text, (x + 10, y + 45))
+            desc_rect = desc_text.get_rect(x=x + 10, y=y + 45, width=480)  # Constrain width
+            screen.blit(desc_text, desc_rect)
             
             # Show if item is active/purchased
             if (item["effect"] == "jetpack" and self.game.player.jetpack.purchased) or \
